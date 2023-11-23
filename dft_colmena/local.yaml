@@ -1,0 +1,9 @@
+mat_file: /homes/heng.ma/Research/md_pkgs/dft_colmena/example-dft-code/example-structure-data/qm7.mat
+num_parallel_tasks: 4
+
+compute_settings:
+  name: local
+  max_workers: 4
+  # available_accelerators: [0, 1, 2]
+  
+  
