@@ -83,8 +83,6 @@ class Thinker(BaseThinker):  # type: ignore[misc]
 
         self.submit_task(
             "dft",
-            self.mat_file,
-            self.output_dir,
             self.task_idx,
         )
         self.task_idx += 1
@@ -190,10 +188,8 @@ if __name__ == "__main__":
     parsl_config = cfg.compute_settings.config_factory(cfg.run_dir / "run-info")
 
     # Assign constant settings to each task function
-    # my_run_inference = partial(
-    #     run_inference, output_dir=cfg.output_dir, hf_dir=cfg.hf_dir
-    # )
-    # update_wrapper(my_run_inference, run_inference)
+    my_run_dft = partial(run_dft, mat_file=cfg.mat_file, output_dir=cfg.output_dir)
+    update_wrapper(my_run_dft, run_dft)
 
     doer = ParslTaskServer([run_dft], queues, parsl_config)
 
