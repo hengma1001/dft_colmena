@@ -20,20 +20,24 @@ from pydantic import root_validator
 from utils import BaseSettings
 
 
-def run_dft(coords, atomic_numbers, output_dir, ind):
-    sys.path.append("/homes/heng.ma/Research/md_pkgs/dft_colmena")
-
+def run_dft(mat_file, output_dir, ind):
+    sys.path.append("../")
     from dft_colmena.utils import (
         compute_energy_gradients,
         create_pyscf_mole,
         save_result,
     )
 
-    mol = create_pyscf_mole(atomic_numbers, coords)
+    data = sio.loadmat(mat_file)
+
+    coordinates = data["R"][ind]
+    atomic_numbers = data["Z"][ind]
+
+    mol = create_pyscf_mole(atomic_numbers, coordinates)
     energy, gradients = compute_energy_gradients(mol)
 
     h5_file = f"{output_dir}/run_{ind:05d}.h5"
-    save_result(h5_file, energy, gradients, coords, atomic_numbers)
+    save_result(h5_file, energy, gradients, coordinates, atomic_numbers)
 
 
 class Thinker(BaseThinker):  # type: ignore[misc]
@@ -52,10 +56,11 @@ class Thinker(BaseThinker):  # type: ignore[misc]
         self.output_dir = output_dir
         self.task_idx = 0
         self.num_parallel_tasks = num_parallel_tasks
+        self.mat_file = mat_file
         data = sio.loadmat(mat_file)
 
         self.coordinates = data["R"]
-        self.atomic_numbers = data["Z"]
+        # self.atomic_numbers = data["Z"]
 
         self.n_tasks = len(self.coordinates)
         logging.info(f"Processing {len(self.coordinates)} input files")
@@ -76,12 +81,9 @@ class Thinker(BaseThinker):  # type: ignore[misc]
             self.done.set()
             return
 
-        coords = self.coordinates[self.task_idx]
-        atomic_numbers = self.atomic_numbers[self.task_idx]
         self.submit_task(
             "dft",
-            coords,
-            atomic_numbers,
+            self.mat_file,
             self.output_dir,
             self.task_idx,
         )
