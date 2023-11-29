@@ -157,6 +157,7 @@ class ThetaSettings(BaseComputeSettings):
 
     num_nodes: int = 1
     """Number of nodes to request"""
+    max_workers: int = 4
     worker_init: str = ""
     """How to start a worker. Should load any modules and activate the conda env."""
     scheduler_options: str = ""
@@ -185,12 +186,14 @@ class ThetaSettings(BaseComputeSettings):
                 HighThroughputExecutor(
                     label="theta_local_htex_multinode",
                     address=address_by_interface("vlan2360"),
-                    max_workers=4,
+                    max_workers=self.max_workers,
                     cpu_affinity="block",  # Ensures that workers use cores on the same tile
                     provider=CobaltProvider(
                         queue=self.queue,
                         account=self.account,
-                        launcher=AprunLauncher(overrides="-d 64 --cc depth"),
+                        launcher=AprunLauncher(
+                            overrides=f"-d {self.cpus_per_node * self.num_nodes / self.max_workers} --cc depth"
+                        ),
                         walltime=self.walltime,
                         nodes_per_block=self.num_nodes,
                         init_blocks=1,
