@@ -21,7 +21,9 @@ from utils import BaseSettings
 
 
 def run_dft(coords, atomic_numbers, output_dir, ind):
-    sys.path.append("/homes/heng.ma/Research/md_pkgs/dft_colmena")
+    sys.path.append("../")
+
+    import numpy as np
 
     from dft_colmena.utils import (
         compute_energy_gradients,
@@ -29,7 +31,7 @@ def run_dft(coords, atomic_numbers, output_dir, ind):
         save_result,
     )
 
-    mol = create_pyscf_mole(atomic_numbers, coords)
+    mol = create_pyscf_mole(np.array(atomic_numbers), np.array(coords))
     energy, gradients = compute_energy_gradients(mol)
 
     h5_file = f"{output_dir}/run_{ind:05d}.h5"
@@ -80,8 +82,8 @@ class Thinker(BaseThinker):  # type: ignore[misc]
         atomic_numbers = self.atomic_numbers[self.task_idx]
         self.submit_task(
             "dft",
-            coords,
-            atomic_numbers,
+            list(coords),
+            list(atomic_numbers),
             self.output_dir,
             self.task_idx,
         )
