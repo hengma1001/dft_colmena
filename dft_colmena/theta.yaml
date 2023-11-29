@@ -1,0 +1,14 @@
+mat_file: /lus/eagle/projects/RL-fold/hengma/DFT/qm7.mat
+num_parallel_tasks: 8
+
+compute_settings:
+  name: theta
+  num_nodes: 2
+  max_works: 8
+  account: RL-fold
+  worker_init: "source activate /lus/eagle/projects/RL-fold/hengma/conda_envs/dft_colmena"
+  scheduler_options: "#PBS -l filesystems=home:eagle"
+  queue: debug-cache-quad
+  walltime: 1:00:00
+
+  
