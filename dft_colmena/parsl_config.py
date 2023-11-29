@@ -158,6 +158,7 @@ class ThetaSettings(BaseComputeSettings):
     num_nodes: int = 1
     """Number of nodes to request"""
     max_workers: int = 4
+    """number of workers"""
     worker_init: str = ""
     """How to start a worker. Should load any modules and activate the conda env."""
     scheduler_options: str = ""
@@ -214,5 +215,8 @@ class ThetaSettings(BaseComputeSettings):
 
 
 ComputeSettingsTypes = Union[
-    LocalSettings, WorkstationSettings, PolarisSettings, ThetaSettings
+    LocalSettings,
+    WorkstationSettings,
+    PolarisSettings,
+    ThetaSettings,
 ]
