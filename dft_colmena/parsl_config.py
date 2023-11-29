@@ -1,13 +1,13 @@
 """Utilities to build Parsl configurations."""
 import os
 from abc import ABC, abstractmethod
-from typing import Literal, Sequence, Tuple, Union
+from typing import Literal, Optional, Sequence, Tuple, Union
 
-from parsl.addresses import address_by_hostname
+from parsl.addresses import address_by_hostname, address_by_interface
 from parsl.config import Config
 from parsl.executors import HighThroughputExecutor
-from parsl.launchers import MpiExecLauncher
-from parsl.providers import LocalProvider, PBSProProvider
+from parsl.launchers import AprunLauncher, MpiExecLauncher
+from parsl.providers import CobaltProvider, LocalProvider, PBSProProvider
 from pydantic import validator
 from utils import BaseSettings, PathLike
 
@@ -151,4 +151,72 @@ class PolarisSettings(BaseComputeSettings):
         )
 
 
-ComputeSettingsTypes = Union[LocalSettings, WorkstationSettings, PolarisSettings]
+class ThetaSettings(BaseComputeSettings):
+    name: Literal["theta"] = "theta"  # type: ignore[assignment]
+    label: str = "htex"
+
+    num_nodes: int = 1
+    """Number of nodes to request"""
+    max_workers: int = 4
+    """number of workers"""
+    worker_init: str = ""
+    """How to start a worker. Should load any modules and activate the conda env."""
+    scheduler_options: str = ""
+    """PBS directives, pass -J for array jobs"""
+    account: str
+    """The account to charge comptue to."""
+    queue: str = "default"
+    """Which queue to submit jobs to, will usually be prod."""
+    walltime: str = "1:00:00"
+    """Maximum job time."""
+    cpus_per_node: int = 64
+    """Up to 64 with multithreading."""
+    strategy: str = "simple"
+
+    def config_factory(self, run_dir: PathLike) -> Config:
+        """Create a configuration suitable for running all tasks on single nodes of theta
+        We will launch 4 workers per node, each pinned to a different GPU
+        Args:
+            num_nodes: Number of nodes to use for the MPI parallel tasks
+            user_options: Options for which account to use, location of environment files, etc
+            run_dir: Directory in which to store Parsl run files. Default: `runinfo`
+        """
+
+        return Config(
+            executors=[
+                HighThroughputExecutor(
+                    label="theta_local_htex_multinode",
+                    address=address_by_interface("vlan2360"),
+                    max_workers=self.max_workers,
+                    cpu_affinity="block",  # Ensures that workers use cores on the same tile
+                    provider=CobaltProvider(
+                        queue=self.queue,
+                        account=self.account,
+                        launcher=AprunLauncher(
+                            overrides=f"-d {self.cpus_per_node * self.num_nodes / self.max_workers} --cc depth"
+                        ),
+                        walltime=self.walltime,
+                        nodes_per_block=self.num_nodes,
+                        init_blocks=1,
+                        min_blocks=1,
+                        max_blocks=1,
+                        # string to prepend to #COBALT blocks in the submit
+                        # script to the scheduler eg: '#COBALT -t 50'
+                        scheduler_options=self.scheduler_options,
+                        # Command to be run before starting a worker, such as:
+                        # 'module load Anaconda; source activate parsl_env'.
+                        worker_init=self.worker_init,  # "source activate /lus/eagle/projects/RL-fold/hengma/conda_envs/dft_colmena",
+                        cmd_timeout=120,
+                    ),
+                )
+            ],
+            run_dir=str(run_dir),
+        )
+
+
+ComputeSettingsTypes = Union[
+    LocalSettings,
+    WorkstationSettings,
+    PolarisSettings,
+    ThetaSettings,
+]
