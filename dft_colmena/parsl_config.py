@@ -205,7 +205,7 @@ class ThetaSettings(BaseComputeSettings):
                         scheduler_options=self.scheduler_options,
                         # Command to be run before starting a worker, such as:
                         # 'module load Anaconda; source activate parsl_env'.
-                        worker_init=self.work_init,  # "source activate /lus/eagle/projects/RL-fold/hengma/conda_envs/dft_colmena",
+                        worker_init=self.worker_init,  # "source activate /lus/eagle/projects/RL-fold/hengma/conda_envs/dft_colmena",
                         cmd_timeout=120,
                     ),
                 )
