@@ -1,7 +1,7 @@
 """Utilities to build Parsl configurations."""
 import os
 from abc import ABC, abstractmethod
-from typing import Literal, Sequence, Tuple, Union
+from typing import Literal, Optional, Sequence, Tuple, Union
 
 from parsl.addresses import address_by_hostname, address_by_interface
 from parsl.config import Config
@@ -170,7 +170,6 @@ class ThetaSettings(BaseComputeSettings):
     cpus_per_node: int = 64
     """Up to 64 with multithreading."""
     strategy: str = "simple"
-    work_init: Optional[str] = None
 
     def config_factory(self, run_dir: PathLike) -> Config:
         """Create a configuration suitable for running all tasks on single nodes of theta
@@ -199,7 +198,7 @@ class ThetaSettings(BaseComputeSettings):
                         max_blocks=1,
                         # string to prepend to #COBALT blocks in the submit
                         # script to the scheduler eg: '#COBALT -t 50'
-                        scheduler_options="",
+                        scheduler_options=self.scheduler_options,
                         # Command to be run before starting a worker, such as:
                         # 'module load Anaconda; source activate parsl_env'.
                         worker_init=self.work_init,  # "source activate /lus/eagle/projects/RL-fold/hengma/conda_envs/dft_colmena",
@@ -207,6 +206,7 @@ class ThetaSettings(BaseComputeSettings):
                     ),
                 )
             ],
+            run_dir=str(run_dir),
         )
 
 
