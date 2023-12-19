@@ -3,7 +3,7 @@ import os
 from abc import ABC, abstractmethod
 from typing import Literal, Optional, Sequence, Tuple, Union
 
-from parsl.addresses import address_by_hostname
+from parsl.addresses import address_by_hostname, address_by_interface
 from parsl.config import Config
 from parsl.executors import HighThroughputExecutor
 from parsl.launchers import MpiExecLauncher
@@ -193,14 +193,13 @@ class PolarisCPUSettings(BaseComputeSettings):
                     worker_debug=True,
                     max_workers=self.max_workers,  # Caps the number of workers launched per node.
                     cores_per_worker=self.cpus_per_node / self.max_workers,
-                    address=address_by_hostname(),
-                    cpu_affinity="block",
+                    address=address_by_interface("bond0"),
+                    cpu_affinity="block-reverse",
                     prefetch_capacity=0,  # Increase if you have many more tasks than workers
                     start_method="spawn",
                     provider=PBSProProvider(  # type: ignore[no-untyped-call]
                         launcher=MpiExecLauncher(
-                            bind_cmd="--cpu-bind depth",
-                            overrides=f"--depth={self.cpus_per_node / self.max_workers} --ppn {self.max_workers}",
+                            bind_cmd="--cpu-bind", overrides="--depth=64 --ppn 1"
                         ),  # Updates to the mpiexec command
                         account=self.account,
                         queue=self.queue,
@@ -227,4 +226,5 @@ ComputeSettingsTypes = Union[
     LocalSettings,
     WorkstationSettings,
     PolarisSettings,
+    PolarisCPUSettings,
 ]

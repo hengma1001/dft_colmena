@@ -1,4 +1,5 @@
 mat_file: /lus/eagle/projects/RL-fold/hengma/DFT/qm7.mat
+num_runs: 30
 num_parallel_tasks: 8
 
 compute_settings:
