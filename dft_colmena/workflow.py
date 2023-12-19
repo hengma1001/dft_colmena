@@ -11,19 +11,17 @@ from colmena.models import Result
 from colmena.queue.python import PipeQueues
 from colmena.task_server import ParslTaskServer
 from colmena.thinker import BaseThinker, agent, result_processor
-
-# from esmfold import run_inference
-from parsl_config import ComputeSettingsTypes
 from proxystore.store import register_store
 from proxystore.store.file import FileStore
 from pydantic import root_validator
-from utils import BaseSettings
+
+# from esmfold import run_inference
+from dft_colmena.parsl_config import ComputeSettingsTypes
+from dft_colmena.utils import BaseSettings
 
 
-def run_dft(coords, atomic_numbers, output_dir, ind):
-    sys.path.append("../")
-
-    import numpy as np
+def run_dft(ind, mat_file, output_dir):
+    import scipy.io as sio
 
     from dft_colmena.utils import (
         compute_energy_gradients,
@@ -31,36 +29,32 @@ def run_dft(coords, atomic_numbers, output_dir, ind):
         save_result,
     )
 
-    mol = create_pyscf_mole(np.array(atomic_numbers), np.array(coords))
+    data = sio.loadmat(mat_file)
+    coordinates = data["R"][ind]
+    atomic_numbers = data["Z"][ind]
+
+    mol = create_pyscf_mole(atomic_numbers, coordinates)
     energy, gradients = compute_energy_gradients(mol)
 
     h5_file = f"{output_dir}/run_{ind:05d}.h5"
-    save_result(h5_file, energy, gradients, coords, atomic_numbers)
+    save_result(h5_file, energy, gradients, coordinates, atomic_numbers)
 
 
 class Thinker(BaseThinker):  # type: ignore[misc]
     def __init__(
         self,
-        mat_file: Path,
         result_dir: Path,
-        output_dir: Path,
         num_parallel_tasks: int,
+        num_runs: int,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
 
         result_dir.mkdir(exist_ok=True)
         self.result_dir = result_dir
-        self.output_dir = output_dir
         self.task_idx = 0
         self.num_parallel_tasks = num_parallel_tasks
-        data = sio.loadmat(mat_file)
-
-        self.coordinates = data["R"]
-        self.atomic_numbers = data["Z"]
-
-        self.n_tasks = len(self.coordinates)
-        logging.info(f"Processing {len(self.coordinates)} input files")
+        self.num_runs = num_runs
 
     def log_result(self, result: Result, topic: str) -> None:
         """Write a JSON result per line of the output file."""
@@ -74,17 +68,12 @@ class Thinker(BaseThinker):  # type: ignore[misc]
 
     def submit_dft_task(self) -> None:
         # If we finished processing all the results, then stop
-        if self.task_idx >= self.n_tasks:
+        if self.task_idx >= self.num_runs:
             self.done.set()
             return
 
-        coords = self.coordinates[self.task_idx]
-        atomic_numbers = self.atomic_numbers[self.task_idx]
         self.submit_task(
             "dft",
-            list(coords),
-            list(atomic_numbers),
-            self.output_dir,
             self.task_idx,
         )
         self.task_idx += 1
@@ -124,20 +113,15 @@ class WorkflowSettings(BaseSettings):
     """output path (set automatically)"""
     omp_threads: int = 1
 
-    # num_data_workers: int = 16
-    # """Number of cores to use for datalaoder."""
     num_parallel_tasks: int = 6
     """Number of parallel task to run (should be the total number of GPUs for GPU jobs)"""
+    num_runs: int = 0
+    """Number of runs to finish, will run all inputs if set as 0"""
     node_local_path: Optional[Path] = None
     """Node local storage option for writing output csv files."""
 
     compute_settings: ComputeSettingsTypes
     """The compute settings to use."""
-
-    # validators
-    # _input_dir_exists = path_validator("input_dir")
-    # _script_path_exists = path_validator("script_path")
-    # _checkpoint_dir_exists = path_validator("checkpoint_dir")
 
     def configure_logging(self) -> None:
         """Set up logging."""
@@ -189,20 +173,21 @@ if __name__ == "__main__":
     # for common use cases or by defining your own configuration.)
     parsl_config = cfg.compute_settings.config_factory(cfg.run_dir / "run-info")
 
-    # Assign constant settings to each task function
-    # my_run_inference = partial(
-    #     run_inference, output_dir=cfg.output_dir, hf_dir=cfg.hf_dir
-    # )
-    # update_wrapper(my_run_inference, run_inference)
+    my_run_dft = partial(run_dft, mat_file=cfg.mat_file, output_dir=cfg.output_dir)
+    update_wrapper(my_run_dft, run_dft)
+    doer = ParslTaskServer([my_run_dft], queues, parsl_config)
 
-    doer = ParslTaskServer([run_dft], queues, parsl_config)
+    if cfg.num_runs <= 0:
+        data = sio.loadmat(cfg.mat_file)
+        num_runs = len(data["R"])
+    else:
+        num_runs = cfg.num_runs
 
     thinker = Thinker(
         queue=queues,
-        mat_file=cfg.mat_file,
         result_dir=cfg.run_dir / "result",
-        output_dir=cfg.output_dir,
         num_parallel_tasks=cfg.num_parallel_tasks,
+        num_runs=cfg.num_runs,
     )
     logging.info("Created the task server and task generator")
 
