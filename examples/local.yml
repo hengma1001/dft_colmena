@@ -1,10 +1,15 @@
+# input file 
 mat_file: /homes/heng.ma/Research/md_pkgs/dft_colmena/example-dft-code/example-structure-data/qm7.mat
+# total number of runs to run, set to 0 to run all the input sets
 num_runs: 10
+# number of parallel tasks 
 num_parallel_tasks: 4
 
 compute_settings:
   name: local
+  # number of works, should be the same with `num_parallel_tasks`
   max_workers: 4
+  
   # available_accelerators: [0, 1, 2]
   
   
